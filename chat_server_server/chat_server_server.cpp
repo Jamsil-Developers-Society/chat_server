@@ -264,32 +264,115 @@ private:
                 do_accept();
             });
     }
+
+    void read_initial_data(tcp::socket socket) {
+        // 공유된 소켓 객체를 생성
+        auto socket_ptr = make_shared<tcp::socket>(move(socket));
+        auto buffer = make_shared<string>();
+
+        boost::asio::async_read_until(*socket_ptr, boost::asio::dynamic_buffer(*buffer), "\n",
+            [this, socket_ptr, buffer](boost::system::error_code ec, size_t length) {
+                if (!ec) {
+                    // 초기 데이터 해석
+                    string initial_data = buffer->substr(0, length - 1);
+                    buffer->erase(0, length);
+
+                    cout << "Initial data received: " << initial_data << endl;
+
+                    // 초기 데이터를 해석해서 방 참여 등을 처리
+                    check_message(initial_data);
+                }
+                else {
+                    cerr << "Error reading initial data: " << ec.message() << endl;
+                }
+            }
+        );
+    }
+
     void check_message(string message) {
-        // str이 무슨 명령을 지시하는지
-        // 그 명령에 따라서 어떤 함수를 실행하는지가 정의가 되야한다.
+        size_t delimiter_pos = message.find('?');
+        if (delimiter_pos == string::npos) {
+            cerr << "Invalid message format: " << message << endl;
+            return;
+        }
 
-        // 인터페이스쪽에서 보내지는 명령의 종류
-        // 메세지 프로토콜 : 함수명?변수명1:데이터1/변수명2:데이터2
-        // 1. 회원가입
-        //   create_user?id:aaa/password:bbb
-        // 2. 로그인
-        //   login_user?id:aaa/password:bbb
-        // 3. 방생성(유저 초대와 동일 인터페이스가)
-        //   create_room?title:gfdsa
-        // 4. 방참여
-        //   join_room?room_id:1
-        // 5. 메세지 보내기
-        //   send_text?room_id:1/user_id:1/text:안녕하세요
-        // 6. 방 나가기
-        //   exit_room?room_id:1/user_id:1
-        // 7. 유저 추방
-        //   kick_user?room_id:1/user_id:1/target_user_id:2
-        // 8. 방장 위임
-        //   grant_host?room_id:1/user_id:1/target_user_id:2
-        // 9. 유저 초대(방생성과 동일 인터페이스가)
-        //   invite_user?room_id:1/user_id:1/target_user_id:2
+        string command = message.substr(0, delimiter_pos);
+        string params = message.substr(delimiter_pos + 1);
 
-        // 
+        unordered_map<string, string> param_map;
+        size_t start = 0, end;
+        while ((end = params.find('/', start)) != string::npos) {
+            string pair = params.substr(start, end - start);
+            size_t sep = pair.find(':');
+            if (sep != string::npos) {
+                param_map[pair.substr(0, sep)] = pair.substr(sep + 1);
+            }
+            start = end + 1;
+        }
+
+        if (start < params.size()) {
+            string pair = params.substr(start);
+            size_t sep = pair.find(':');
+            if (sep != string::npos) {
+                param_map[pair.substr(0, sep)] = pair.substr(sep + 1);
+            }
+        }
+
+        if (command.empty()) {
+            cerr << "Empty command received." << endl;
+            return;
+        }
+
+        if (command == "create_user") {
+            string id = param_map["id"];
+            string password = param_map["password"];
+            cout << "Creating user with id: " << id << " and password: " << password << endl;
+        }
+        else if (command == "login_user") {
+            string id = param_map["id"];
+            string password = param_map["password"];
+            cout << "Logging in user with id: " << id << " and password: " << password << endl;
+        }
+        else if (command == "create_room") {
+            string title = param_map["title"];
+            cout << "Creating room with title: " << title << endl;
+        }
+        else if (command == "join_room") {
+            int room_id = stoi(param_map["room_id"]);
+            cout << "Joining room with id: " << room_id << endl;
+        }
+        else if (command == "send_text") {
+            int room_id = stoi(param_map["room_id"]);
+            int user_id = stoi(param_map["user_id"]);
+            string text = param_map["text"];
+            cout << "User " << user_id << " is sending message: " << text << " in room " << room_id << endl;
+        }
+        else if (command == "exit_room") {
+            int room_id = stoi(param_map["room_id"]);
+            int user_id = stoi(param_map["user_id"]);
+            cout << "User " << user_id << " is exiting room " << room_id << endl;
+        }
+        else if (command == "kick_user") {
+            int room_id = stoi(param_map["room_id"]);
+            int user_id = stoi(param_map["user_id"]);
+            int target_user_id = stoi(param_map["target_user_id"]);
+            cout << "User " << user_id << " is kicking user " << target_user_id << " from room " << room_id << endl;
+        }
+        else if (command == "grant_host") {
+            int room_id = stoi(param_map["room_id"]);
+            int user_id = stoi(param_map["user_id"]);
+            int target_user_id = stoi(param_map["target_user_id"]);
+            cout << "User " << user_id << " is granting host role to user " << target_user_id << " in room " << room_id << endl;
+        }
+        else if (command == "invite_user") {
+            int room_id = stoi(param_map["room_id"]);
+            int user_id = stoi(param_map["user_id"]);
+            int target_user_id = stoi(param_map["target_user_id"]);
+            cout << "User " << user_id << " is inviting user " << target_user_id << " to room " << room_id << endl;
+        }
+        else {
+            cerr << "Unknown command: " << command << endl;
+        }
     }
 
     tcp::acceptor acceptor_;
