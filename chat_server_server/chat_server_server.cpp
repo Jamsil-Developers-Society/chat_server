@@ -323,48 +323,48 @@ private:
             return;
         }
 
-        if (command == "create_user") {
+        if (command == "create_user") { // do_accept()
             string id = param_map["id"];
             string password = param_map["password"];
             cout << "Creating user with id: " << id << " and password: " << password << endl;
         }
-        else if (command == "login_user") {
+        else if (command == "login_user") { // do_accept()
             string id = param_map["id"];
             string password = param_map["password"];
             cout << "Logging in user with id: " << id << " and password: " << password << endl;
         }
-        else if (command == "create_room") {
+        else if (command == "create_room") { // do_accept()
             string title = param_map["title"];
             cout << "Creating room with title: " << title << endl;
         }
-        else if (command == "join_room") {
+        else if (command == "join_room") { // do_accept()
             int room_id = stoi(param_map["room_id"]);
             cout << "Joining room with id: " << room_id << endl;
         }
-        else if (command == "send_text") {
+        else if (command == "send_text") {// do_read()
             int room_id = stoi(param_map["room_id"]);
             int user_id = stoi(param_map["user_id"]);
             string text = param_map["text"];
             cout << "User " << user_id << " is sending message: " << text << " in room " << room_id << endl;
         }
-        else if (command == "exit_room") {
+        else if (command == "exit_room") {// do_read()
             int room_id = stoi(param_map["room_id"]);
             int user_id = stoi(param_map["user_id"]);
             cout << "User " << user_id << " is exiting room " << room_id << endl;
         }
-        else if (command == "kick_user") {
+        else if (command == "kick_user") {// do_read()
             int room_id = stoi(param_map["room_id"]);
             int user_id = stoi(param_map["user_id"]);
             int target_user_id = stoi(param_map["target_user_id"]);
             cout << "User " << user_id << " is kicking user " << target_user_id << " from room " << room_id << endl;
         }
-        else if (command == "grant_host") {
+        else if (command == "grant_host") {// do_read()
             int room_id = stoi(param_map["room_id"]);
             int user_id = stoi(param_map["user_id"]);
             int target_user_id = stoi(param_map["target_user_id"]);
             cout << "User " << user_id << " is granting host role to user " << target_user_id << " in room " << room_id << endl;
         }
-        else if (command == "invite_user") {
+        else if (command == "invite_user") {// do_read()
             int room_id = stoi(param_map["room_id"]);
             int user_id = stoi(param_map["user_id"]);
             int target_user_id = stoi(param_map["target_user_id"]);
