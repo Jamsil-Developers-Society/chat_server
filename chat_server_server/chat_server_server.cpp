@@ -131,7 +131,7 @@ public:
     ChatSession(tcp::socket socket, ChatServer& server)
         : socket_(move(socket)), server_(server) {
     }
-
+    //새로운 클라이언트 연결 시작
     void start(shared_ptr<ChatSession> self, shared_ptr<ChatUser> user) {
         self_ = self;
         user_ = user;
@@ -146,6 +146,7 @@ public:
     tcp::socket& get_socket() { return socket_; }
 
 private:
+    //클라이언트로부터 방 ID 및 유저 정보를 파싱
     void read_initial_data() {
         auto self = shared_from_this();
         boost::asio::async_read_until(socket_, boost::asio::dynamic_buffer(buffer_), "\n",
@@ -180,6 +181,7 @@ private:
         }
     }
 
+    //클라이언트 메시지를 읽어 채팅방에 브로드캐스트
     void do_read() {
         auto self = shared_from_this();
         boost::asio::async_read_until(socket_, boost::asio::dynamic_buffer(buffer_), "\n",
@@ -252,14 +254,80 @@ public:
     }
 
 private:
+    //클라이언트로부터 받은 명령어(create_user, login_user, create_room, join_room)를 처리.
+    void handle_accept_commands(const string& command, const unordered_map<string, string>& param_map) {
+        if (command == "create_user") {
+            string id = param_map.at("id");
+            string password = param_map.at("password");
+            cout << "Creating user with id: " << id << " and password: " << password << endl;
+        }
+        else if (command == "login_user") {
+            string id = param_map.at("id");
+            string password = param_map.at("password");
+            cout << "Logging in user with id: " << id << " and password: " << password << endl;
+        }
+        else if (command == "create_room") {
+            string title = param_map.at("title");
+            cout << "Creating room with title: " << title << endl;
+        }
+        else if (command == "join_room") {
+            int room_id = stoi(param_map.at("room_id"));
+            cout << "Joining room with id: " << room_id << endl;
+        }
+    }
+    
+    //새로운 클라이언트 연결을 수락
     void do_accept() {
+        //새로운 클라이언트 연결을 비동기적으로 대기
         acceptor_.async_accept(
             [this](boost::system::error_code ec, tcp::socket socket) {
                 if (!ec) {
                     cout << "New connection from " << socket.remote_endpoint() << endl;
 
-                    auto session = make_shared<ChatSession>(move(socket), *this);
-                    session->start(session,);  // ChatSession에서 room_id와 user_id를 받아 방에 입장
+                    //클라이언트 데이터 준비
+                    auto buffer = make_shared<string>(); //데이터를 저장할 공유 포인터로, 클라이언트의 메시지를 임시 저장.
+                    auto socket_ptr = make_shared<tcp::socket>(move(socket)); //객체를 공유 포인터로 감싸서, 클라이언트 연결을 관리.
+
+                    boost::asio::async_read_until(*socket_ptr, boost::asio::dynamic_buffer(*buffer), "\n", //클라이언트로부터 데이터를 비동기적으로 읽습니다.\n읽기를 멈추는 조건
+                        [this, socket_ptr, buffer](boost::system::error_code ec, size_t length) {
+                            if (!ec) {
+                                //데이터 읽기 및 메시지 파싱
+                                string message = buffer->substr(0, length - 1);
+                                buffer->erase(0, length);
+
+                                size_t delimiter_pos = message.find('?');
+                                if (delimiter_pos != string::npos) {
+                                    string command = message.substr(0, delimiter_pos);
+                                    string params = message.substr(delimiter_pos + 1);
+
+                                    unordered_map<string, string> param_map;
+                                    size_t start = 0, end;
+                                    while ((end = params.find('/', start)) != string::npos) {
+                                        string pair = params.substr(start, end - start);
+                                        size_t sep = pair.find(':');
+                                        if (sep != string::npos) {
+                                            param_map[pair.substr(0, sep)] = pair.substr(sep + 1);
+                                        }
+                                        start = end + 1;
+                                    }
+                                    if (start < params.size()) {
+                                        string pair = params.substr(start);
+                                        size_t sep = pair.find(':');
+                                        if (sep != string::npos) {
+                                            param_map[pair.substr(0, sep)] = pair.substr(sep + 1);
+                                        }
+                                    }
+
+                                    handle_accept_commands(command, param_map);
+                                }
+                                else {
+                                    cerr << "Invalid message format: " << message << endl;
+                                }
+                            }
+                            else {
+                                cerr << "Error reading initial data: " << ec.message() << endl;
+                            }
+                        });
                 }
                 do_accept();
             });
@@ -288,7 +356,7 @@ private:
             }
         );
     }
-
+    // 클라이언트로부터 받은 초기 메시지를 분석하고, 해당 명령에 따라 처리
     void check_message(string message) {
         size_t delimiter_pos = message.find('?');
         if (delimiter_pos == string::npos) {
@@ -398,10 +466,12 @@ private:
 
 
 int main() {
+    //Boost.Asio를 사용하여 비동기 방식으로 서버를 실행
     try {
         boost::asio::io_context io_context;
 
-        tcp::endpoint endpoint(tcp::v4(), 12345); // 포트 12345에서 수신 대기
+        // 포트 12345에서 수신 대기
+        tcp::endpoint endpoint(tcp::v4(), 12345); 
         ChatServer server(io_context, endpoint);
 
         cout << "Chat server is running on port 12345..." << endl;
